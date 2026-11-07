@@ -12,7 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # package.json の packageManager に書いた bun のバージョンを使う（bun.lock の形式がバージョンで変わるため）
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - uses: dtolnay/rust-toolchain@stable
 

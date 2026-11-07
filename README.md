@@ -98,12 +98,16 @@ PowerShell かコマンドプロンプトで順に実行し、終わったら **
    ```bat
    winget install --id Rustlang.Rustup
    ```
-3. bun
+3. bun（**1.4 以上**。`bun.lock` の形式が新しいため、それより古い bun では読めません）
    ```bat
    winget install --id Oven-sh.Bun
    ```
+   すでに入っている場合は、次で新しくできます。
+   ```bat
+   bun upgrade
+   ```
 
-開き直したターミナルで `cargo --version` と `bun --version` が表示されれば準備完了です。
+開き直したターミナルで `cargo --version` と `bun --version` が表示されれば準備完了です（bun は 1.4 以上）。
 WebView2 は Windows 10 / 11 に最初から入っています。そのほかの OS は [Tauri の Prerequisites](https://v2.tauri.app/start/prerequisites/) を参照してください。
 
 ### コマンド

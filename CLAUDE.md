@@ -4,7 +4,7 @@ OBS の録画を見返してクリップを作る Tauri v2 + React アプリ。�
 
 ## ルール
 
-- パッケージマネージャーは **bun** だけを使う。npm / yarn / pnpm のコマンドやロックファイル（package-lock.json など）を持ち込まない。ロックファイルは `bun.lock`。
+- パッケージマネージャーは **bun** だけを使う。npm / yarn / pnpm のコマンドやロックファイル（package-lock.json など）を持ち込まない。ロックファイルは `bun.lock`。bun のバージョンは `package.json` の `packageManager`（今は 1.4.4）にそろえる。古い bun は新しい `bun.lock` を読めないので、上げたら README と CI もそろえる。
 - `src-tauri/tauri.conf.json` の beforeDevCommand / beforeBuildCommand、GitHub Actions、README の手順もすべて bun で書く。
 - 返答・README・コードコメントは日本語。
 - UI を変えるときは `DESIGN.md` の方向性（色・文字・言葉づかい・動き）に従う。
