@@ -1,6 +1,5 @@
 import type { ClipMode, ClipResult } from "../lib/api";
 import { baseName, fmtSize } from "../lib/format";
-import { Icon } from "./Icon";
 
 export type Job = {
   id: number;
@@ -12,10 +11,15 @@ export type Job = {
   error?: string;
 };
 
-const MODE_LABEL: Record<ClipMode, string> = { fast: "高速", quality: "高画質", discord: "圧縮" };
+const RUNNING_TEXT: Record<ClipMode, string> = {
+  fast: "そのまま切り抜き中",
+  quality: "きれいに書き出し中",
+  discord: "Discord用に小さくしています",
+};
 
 type Props = {
   jobs: Job[];
+  limitMb: number;
   onCancel: (id: number) => void;
   onDismiss: (id: number) => void;
   onPlay: (path: string) => void;
@@ -23,46 +27,77 @@ type Props = {
   onCopy: (path: string) => void;
 };
 
-/** 右下に出る書き出しジョブの一覧 */
-export function Jobs({ jobs, onCancel, onDismiss, onPlay, onReveal, onCopy }: Props) {
+function doneText(job: Job, limitMb: number): string {
+  const size = job.result!.size;
+  if (job.mode === "discord") {
+    return size <= limitMb * 1000 * 1000
+      ? `${fmtSize(size)} なので、Discord にそのまま貼れます`
+      : `${fmtSize(size)} で ${limitMb}MB を超えました。範囲を短くしてもう一度どうぞ`;
+  }
+  return `${fmtSize(size)} ・ ${baseName(job.result!.path)}`;
+}
+
+/** 右上に出る切り抜きの進み具合と結果 */
+export function Jobs({ jobs, limitMb, onCancel, onDismiss, onPlay, onReveal, onCopy }: Props) {
   if (!jobs.length) return null;
   return (
-    <div className="jobs">
+    <div className="jobs" aria-live="polite">
       {jobs.map((j) => (
-        <div key={j.id} className={`job ${j.status}`}>
-          <div className="job-head">
-            <Icon name="scissors" size={14} />
-            <span className="job-label" title={j.result?.path ?? j.label}>
-              {j.result ? baseName(j.result.path) : j.label}
-            </span>
-            <span className="job-mode">{MODE_LABEL[j.mode]}</span>
-            {j.status !== "running" && (
-              <button className="icon-btn tiny" onClick={() => onDismiss(j.id)} aria-label="閉じる">
-                <Icon name="close" size={14} />
-              </button>
-            )}
-          </div>
-
+        <div key={j.id} className={`job panel ${j.status}`}>
           {j.status === "running" && (
-            <div className="job-body">
-              <div className="progress">
-                <div style={{ width: `${Math.round(j.ratio * 100)}%` }} />
+            <>
+              <div className="job-head">
+                <b className="job-title">{j.label}</b>
+                <span className="dim">{RUNNING_TEXT[j.mode]}</span>
               </div>
-              <span className="dim">{Math.round(j.ratio * 100)}%</span>
-              <button className="link" onClick={() => onCancel(j.id)}>キャンセル</button>
-            </div>
+              <div className="job-row">
+                <div className="progress" role="progressbar" aria-valuenow={Math.round(j.ratio * 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <div style={{ width: `${Math.round(j.ratio * 100)}%` }} />
+                </div>
+                <span className="tc">{Math.round(j.ratio * 100)}%</span>
+                <button className="btn small" onClick={() => onCancel(j.id)}>
+                  やめる
+                </button>
+              </div>
+            </>
           )}
 
           {j.status === "done" && j.result && (
-            <div className="job-body">
-              <span className="ok">完了 {fmtSize(j.result.size)}</span>
-              <button className="link" onClick={() => onPlay(j.result!.path)}>再生</button>
-              <button className="link" onClick={() => onCopy(j.result!.path)} title="Discord などに Ctrl+V で貼れます">コピー</button>
-              <button className="link" onClick={() => onReveal(j.result!.path)}>フォルダ</button>
-            </div>
+            <>
+              <div className="job-head">
+                <b className="job-title">切り抜きました</b>
+                <button className="link" onClick={() => onDismiss(j.id)} aria-label="閉じる">
+                  ×
+                </button>
+              </div>
+              <p className="dim job-text" title={j.result.path}>
+                {doneText(j, limitMb)}
+              </p>
+              <div className="job-row wrap">
+                <button className="btn primary" onClick={() => onCopy(j.result!.path)} title="ファイルとしてコピーします。Discord で Ctrl+V すると貼れます">
+                  コピーして Discord へ
+                </button>
+                <button className="btn" onClick={() => onPlay(j.result!.path)}>
+                  見る
+                </button>
+                <button className="btn" onClick={() => onReveal(j.result!.path)} title="エクスプローラーで表示">
+                  フォルダ
+                </button>
+              </div>
+            </>
           )}
 
-          {j.status === "error" && <pre className="job-error">{j.error}</pre>}
+          {j.status === "error" && (
+            <>
+              <div className="job-head">
+                <b className="job-title">切り抜けませんでした</b>
+                <button className="link" onClick={() => onDismiss(j.id)} aria-label="閉じる">
+                  ×
+                </button>
+              </div>
+              <pre className="job-error">{j.error}</pre>
+            </>
+          )}
         </div>
       ))}
     </div>

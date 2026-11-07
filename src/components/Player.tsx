@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fileSrc, type ClipMode, type VideoFile } from "../lib/api";
-import { fmtDuration, fmtSize, fmtTime, stripExt } from "../lib/format";
+import { fmtClock, fmtDuration, fmtSize, fmtTime, rateLabel, recordingLabel, stripExt } from "../lib/format";
 import { loadMarkers, saveMarkers, type Settings } from "../lib/settings";
-import { Icon } from "./Icon";
 import { Timeline } from "./Timeline";
 
 const RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
+/** ボタンで選べる速度。それ以外は [ ] キーで */
+const SPEED_BUTTONS: [number, string][] = [
+  [0.5, "ゆっくり"],
+  [1, "ふつう"],
+  [2, "2倍"],
+  [4, "4倍"],
+];
 const QUICK_CLIP_SEC = 15;
 
 export type ExportRequest = { start: number; end: number; mode: ClipMode; name: string };
@@ -13,6 +19,8 @@ export type ExportRequest = { start: number; end: number; mode: ClipMode; name: 
 type Props = {
   file: VideoFile | null;
   autoPlay: boolean;
+  /** 新しい録画として自動で開いたか */
+  autoOpened: boolean;
   writing: boolean;
   isClip: boolean;
   settings: Settings;
@@ -30,15 +38,28 @@ type Props = {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 function errorMessage(err: MediaError | null, writing: boolean): string {
-  if (writing) return "OBS がまだ書き込み中のため再生できません。録画を止めるか分割すると見られるようになります（R で再読み込み）。";
+  if (writing) return "OBS がまだ書き込み中なので再生できません。録画を止めるか分割すると見られます（R で読み直し）。";
   switch (err?.code) {
     case MediaError.MEDIA_ERR_DECODE:
-      return "映像をデコードできませんでした。HEVC / AV1 で録画している場合、PC によっては再生できません。";
+      return "映像をデコードできませんでした。HEVC や AV1 で録画していると、PC によっては再生できません。";
     case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-      return "この形式は再生できません。録画中のファイルか、コンテナ / コーデックが未対応の可能性があります（mkv は OBS の「録画の再多重化」で mp4 にできます）。";
+      return "この形式は再生できません。録画中のファイルか、対応していない形式かもしれません（mkv は OBS の「録画の再多重化」で mp4 にできます）。";
     default:
       return "動画を読み込めませんでした。";
   }
+}
+
+function PlayGlyph({ playing }: { playing: boolean }) {
+  return playing ? (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="3" y="2" width="4" height="12" rx="1.5" fill="currentColor" />
+      <rect x="9" y="2" width="4" height="12" rx="1.5" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2.6c0-.8.9-1.3 1.6-.9l8 5.4c.6.4.6 1.4 0 1.8l-8 5.4c-.7.4-1.6-.1-1.6-.9z" fill="currentColor" />
+    </svg>
+  );
 }
 
 export function Player(props: Props) {
@@ -47,6 +68,7 @@ export function Player(props: Props) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const [rate, setRate] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -62,14 +84,16 @@ export function Player(props: Props) {
 
   const src = useMemo(() => (file ? fileSrc(file.path) + (reloadKey ? `?r=${reloadKey}` : "") : null), [file, reloadKey]);
 
-  // ファイルが変わったら範囲・マーカーなどをリセット
+  // ファイルが変わったら範囲・しるしなどをリセット
   useEffect(() => {
     setInPoint(null);
     setOutPoint(null);
     setClipName("");
     setError(null);
+    setErrorDetail(null);
     setCurrent(0);
     setDuration(0);
+    setLoaded(false);
     setReloadKey(0);
     resumeAt.current = null;
     frameDur.current = 1 / 60;
@@ -99,7 +123,7 @@ export function Player(props: Props) {
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
-  // 1 フレームの長さを実測（30fps / 60fps 録画どちらでもコマ送りが 1 コマになるように）
+  // 1 コマの長さを実測（30fps / 60fps どちらの録画でもコマ送りが 1 コマになるように）
   useEffect(() => {
     const v = videoRef.current as (HTMLVideoElement & { requestVideoFrameCallback?: Function; cancelVideoFrameCallback?: Function }) | null;
     if (!v || !v.requestVideoFrameCallback || !playing) return;
@@ -142,11 +166,14 @@ export function Player(props: Props) {
     [duration],
   );
 
-  const seekBy = useCallback((d: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    seekTo(v.currentTime + d);
-  }, [seekTo]);
+  const seekBy = useCallback(
+    (d: number) => {
+      const v = videoRef.current;
+      if (!v) return;
+      seekTo(v.currentTime + d);
+    },
+    [seekTo],
+  );
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -169,7 +196,7 @@ export function Player(props: Props) {
       v.defaultPlaybackRate = r;
     }
     setRate(r);
-    flash(`${r}x`);
+    flash(rateLabel(r));
   };
 
   const changeRate = (dir: 1 | -1) => {
@@ -183,12 +210,12 @@ export function Player(props: Props) {
   const markIn = (t = now()) => {
     setInPoint(t);
     if (outPoint != null && outPoint <= t) setOutPoint(null);
-    flash(`IN ${fmtTime(t, true)}`);
+    flash(`ここから ${fmtTime(t, true)}`);
   };
   const markOut = (t = now()) => {
     setOutPoint(t);
     if (inPoint != null && inPoint >= t) setInPoint(null);
-    flash(`OUT ${fmtTime(t, true)}`);
+    flash(`ここまで ${fmtTime(t, true)}`);
   };
   const quickClip = () => {
     const t = now();
@@ -209,8 +236,9 @@ export function Player(props: Props) {
   const addMarker = () => {
     const t = now();
     if (markers.some((m) => Math.abs(m - t) < 0.3)) return;
-    updateMarkers([...markers, t].sort((a, b) => a - b));
-    flash("マーカー");
+    const next = [...markers, t].sort((a, b) => a - b);
+    updateMarkers(next);
+    flash(`しるし ${next.indexOf(t) + 1}`);
   };
   const jumpMarker = (dir: 1 | -1) => {
     const t = now();
@@ -224,7 +252,7 @@ export function Player(props: Props) {
   const doExport = () => {
     if (!file) return;
     if (!range || rangeLen < 0.1) {
-      props.onNotice("I（開始）と O（終了）で切り出す範囲を決めてください");
+      props.onNotice("I（ここから）と O（ここまで）で切り抜く範囲を決めてください");
       return;
     }
     props.onExport({ start: range.start, end: range.end, mode: settings.clipMode, name: clipName.trim() });
@@ -234,6 +262,8 @@ export function Player(props: Props) {
     resumeAt.current = now();
     autoPlayRef.current = !videoRef.current?.paused;
     setError(null);
+    setErrorDetail(null);
+    setLoaded(false);
     setReloadKey(Date.now());
   };
 
@@ -359,6 +389,7 @@ export function Player(props: Props) {
   const onLoadedMetadata = () => {
     const v = videoRef.current!;
     setDuration(Number.isFinite(v.duration) ? v.duration : 0);
+    setLoaded(true);
     v.playbackRate = rate;
     v.defaultPlaybackRate = rate;
     if (resumeAt.current != null) {
@@ -374,38 +405,43 @@ export function Player(props: Props) {
 
   if (!file) {
     return (
-      <main className="player empty-player">
-        <div className="placeholder">
-          <Icon name="play" size={48} />
-          <p>左の一覧から録画を選んでください</p>
-          <p className="hint">動画ファイルをウィンドウにドラッグ＆ドロップしても開けます。</p>
-          <button className="ghost" onClick={props.onShowHelp}>
-            <Icon name="help" /> ショートカット一覧（?）
+      <main className="player">
+        <div className="stage stage-empty">
+          <p className="stage-title">見たい録画を左から選んでください</p>
+          <p className="dim">動画ファイルやフォルダをウィンドウにドラッグしても開けます。</p>
+          <button className="btn" onClick={props.onShowHelp}>
+            キー操作の一覧 <kbd>?</kbd>
           </button>
         </div>
       </main>
     );
   }
 
+  const title = props.isClip ? stripExt(file.name) : `${fmtClock(file.modified)} の${recordingLabel(file.name)}`;
+  const meta = [props.autoOpened ? "自動で開きました" : null, duration > 0 ? fmtTime(duration) : null, fmtSize(file.size)]
+    .filter(Boolean)
+    .join(" ・ ");
+  const skip = settings.skipSec;
+  const modes: [ClipMode, string, string][] = [
+    ["fast", "そのまま", "作り直さずに一瞬で切り抜きます。始まりが少し前にずれることがあります"],
+    ["quality", "きれいに", "作り直してコマ単位で正確に切り抜きます"],
+    ["discord", "Discord用", `${settings.discordMb}MB 以下に収まるよう小さくします`],
+  ];
+
   return (
     <main className={`player ${props.fullscreen ? "fullscreen" : ""}`}>
       {!props.fullscreen && (
         <header className="player-head">
-          <div className="title">
-            <span className="name" title={file.path}>{stripExt(file.name)}</span>
-            <span className="meta">
-              {fmtSize(file.size)}
-              {duration > 0 && ` ・ ${fmtTime(duration)}`}
-            </span>
-          </div>
+          <h1 title={file.path}>{title}</h1>
+          <span className="dim">{meta}</span>
           <div className="head-actions">
             {props.isClip && (
-              <button className="ghost small" onClick={() => props.onCopyFile(file.path)} title="ファイルをコピー（Discord などに Ctrl+V で貼れます）">
-                <Icon name="copy" size={16} /> コピー
+              <button className="btn small" onClick={() => props.onCopyFile(file.path)} title="ファイルとしてコピーします。Discord で Ctrl+V すると貼れます">
+                コピーして Discord へ
               </button>
             )}
-            <button className="ghost small" onClick={() => props.onReveal(file.path)} title="エクスプローラーで表示">
-              <Icon name="reveal" size={16} /> フォルダで表示
+            <button className="btn small" onClick={() => props.onReveal(file.path)}>
+              フォルダで表示
             </button>
           </div>
         </header>
@@ -437,29 +473,33 @@ export function Player(props: Props) {
             setErrorDetail(err?.message || null);
           }}
         />
+        {!loaded && !error && <p className="stage-note">読み込み中…</p>}
         {error && (
-          <div className="stage-error">
+          <div className="stage-error" role="alert">
             <p>{error}</p>
             {errorDetail && <small className="error-detail">{errorDetail}</small>}
-            <button className="ghost" onClick={reload}>
-              <Icon name="refresh" /> 再読み込み
+            <button className="btn" onClick={reload}>
+              読み直す <kbd>R</kbd>
             </button>
           </div>
         )}
         {!error && writing && (
           <div className="stage-banner">
-            <Icon name="rec" size={12} /> OBS が書き込み中のファイルです。
-            <button className="link" onClick={reload}>再読み込み（R）</button>
+            <span className="rec-dot" aria-hidden="true" />
+            OBS がまだ書き込み中のファイルです
+            <button className="link" onClick={reload}>
+              読み直す（R）
+            </button>
           </div>
         )}
         {osd && (
-          <div className="osd" key={osd.key}>
+          <div className="osd" key={osd.key} aria-hidden="true">
             {osd.text}
           </div>
         )}
       </div>
 
-      <div className="controls">
+      <section className="panel controls" aria-label="再生と切り抜き">
         <Timeline
           src={src}
           duration={duration}
@@ -478,130 +518,133 @@ export function Player(props: Props) {
           }}
         />
 
-        <div className="control-row">
+        <div className="row">
+          <span className="tc timecode">
+            {fmtTime(current, true)} <span className="dim">/ {fmtTime(duration)}</span>
+          </span>
           <div className="group">
-            <button className="icon-btn" onClick={() => seekBy(-settings.skipSec)} title={`${settings.skipSec}秒戻る（←）`}>
-              <Icon name="back" />
+            <button className="btn square" onClick={() => seekBy(-skip)} aria-label={`${skip}秒戻る`} title={`${skip}秒戻る（←）`}>
+              -{skip}
             </button>
-            <button className="icon-btn play" onClick={togglePlay} title="再生 / 一時停止（Space）">
-              <Icon name={playing ? "pause" : "play"} size={22} />
+            <button className="btn square play" onClick={togglePlay} aria-label={playing ? "一時停止" : "再生"} title="再生 / 一時停止（Space）">
+              <PlayGlyph playing={playing} />
             </button>
-            <button className="icon-btn" onClick={() => seekBy(settings.skipSec)} title={`${settings.skipSec}秒進む（→）`}>
-              <Icon name="forward" />
+            <button className="btn square" onClick={() => seekBy(skip)} aria-label={`${skip}秒進む`} title={`${skip}秒進む（→）`}>
+              +{skip}
             </button>
-            <button className="icon-btn" onClick={() => stepFrame(-1)} title="1コマ戻る（,）">
-              <Icon name="frameBack" />
+            <button className="btn" onClick={() => stepFrame(-1)} title="1コマ戻す（,）">
+              コマ戻し
             </button>
-            <button className="icon-btn" onClick={() => stepFrame(1)} title="1コマ進む（.）">
-              <Icon name="frameForward" />
+            <button className="btn" onClick={() => stepFrame(1)} title="1コマ送る（.）">
+              コマ送り
             </button>
-            <span className="time">
-              {fmtTime(current, true)} <span className="dim">/ {fmtTime(duration)}</span>
-            </span>
           </div>
 
-          <div className="group">
-            <div className="rates" title="再生速度（[ ]）">
-              {[0.25, 0.5, 1, 1.5, 2, 4].map((r) => (
-                <button key={r} className={rate === r ? "active" : ""} onClick={() => applyRate(r)}>
-                  {r}x
+          <div className="group push">
+            <div className="seg" role="radiogroup" aria-label="再生速度（[ ] でも変えられます）">
+              {SPEED_BUTTONS.map(([r, label]) => (
+                <button key={r} role="radio" aria-checked={rate === r} className={rate === r ? "on" : ""} onClick={() => applyRate(r)}>
+                  {label}
                 </button>
               ))}
-              {![0.25, 0.5, 1, 1.5, 2, 4].includes(rate) && <span className="rate-extra">{rate}x</span>}
+              {!SPEED_BUTTONS.some(([r]) => r === rate) && <span className="seg-extra">{rateLabel(rate)}</span>}
             </div>
-            <button className="icon-btn" onClick={() => props.updateSettings({ muted: !settings.muted })} title="ミュート（M）">
-              <Icon name={settings.muted || settings.volume === 0 ? "mute" : "volume"} />
+            <label className="volume">
+              <span className="dim">音量</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={settings.muted ? 0 : settings.volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+              />
+            </label>
+            <button className="btn" aria-pressed={settings.muted} onClick={() => props.updateSettings({ muted: !settings.muted })} title="ミュート（M）">
+              {settings.muted ? "音を戻す" : "ミュート"}
             </button>
-            <input
-              className="volume"
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={settings.muted ? 0 : settings.volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              aria-label="音量"
-            />
-            <button className="icon-btn" onClick={props.onToggleFullscreen} title="全画面（F）">
-              <Icon name={props.fullscreen ? "exitFullscreen" : "fullscreen"} />
+            <button className="btn" onClick={props.onToggleFullscreen} title="全画面（F）">
+              {props.fullscreen ? "全画面をやめる" : "全画面"}
             </button>
           </div>
         </div>
 
-        <div className="clip-row">
-          <div className="group">
-            <button className="pill in" onClick={() => markIn()} title="今の位置を開始点に（I）／ Shift+I で移動">
-              IN <b>{inPoint != null ? fmtTime(inPoint, true) : "--:--"}</b>
+        <div className="row clip-row">
+          <button className="btn range-btn" onClick={() => markIn()} title="今の位置を始まりにします（I）。Shift+I でそこへ移動">
+            <b>ここから</b>
+            <span className="tc">{inPoint != null ? fmtTime(inPoint, true) : "--:--"}</span>
+            <kbd>I</kbd>
+          </button>
+          <button className="btn range-btn" onClick={() => markOut()} title="今の位置を終わりにします（O）。Shift+O でそこへ移動">
+            <b>ここまで</b>
+            <span className="tc">{outPoint != null ? fmtTime(outPoint, true) : "--:--"}</span>
+            <kbd>O</kbd>
+          </button>
+          <span className="range-len">{range ? `${fmtDuration(rangeLen)}ぶん` : <span className="dim">範囲はまだありません</span>}</span>
+          <button className="btn" onClick={quickClip}>
+            直前{QUICK_CLIP_SEC}秒 <kbd>Q</kbd>
+          </button>
+          {range && (
+            <button className="btn" onClick={clearRange}>
+              範囲を消す <kbd>X</kbd>
             </button>
-            <button className="pill out" onClick={() => markOut()} title="今の位置を終了点に（O）／ Shift+O で移動">
-              OUT <b>{outPoint != null ? fmtTime(outPoint, true) : "--:--"}</b>
-            </button>
-            <span className="dim range-len">{range ? fmtDuration(rangeLen) : "範囲なし"}</span>
-            <button className="ghost small" onClick={quickClip} title={`直前${QUICK_CLIP_SEC}秒を範囲にする（Q）`}>
-              <Icon name="rewind15" size={16} /> 直前{QUICK_CLIP_SEC}秒
-            </button>
-            {range && (
-              <button className="ghost small" onClick={clearRange} title="範囲をクリア（X）">
-                <Icon name="close" size={14} /> クリア
-              </button>
-            )}
-          </div>
+          )}
 
-          <div className="group">
-            <div className="segmented" role="radiogroup" aria-label="書き出し方法">
-              {(
-                [
-                  ["fast", "高速", "再エンコードせず一瞬で切り出し。開始が少し前にずれることがあります"],
-                  ["quality", "高画質", "再エンコードしてフレーム単位で正確に切り出し"],
-                  ["discord", `${settings.discordMb}MB以下`, `Discord に貼れるよう ${settings.discordMb}MB 以下に圧縮`],
-                ] as const
-              ).map(([mode, label, title]) => (
+          <div className="group push">
+            <div className="seg" role="radiogroup" aria-label="切り抜き方">
+              {modes.map(([mode, label, desc]) => (
                 <button
                   key={mode}
                   role="radio"
                   aria-checked={settings.clipMode === mode}
-                  className={settings.clipMode === mode ? "active" : ""}
+                  className={settings.clipMode === mode ? "on" : ""}
                   onClick={() => props.updateSettings({ clipMode: mode })}
-                  title={title}
+                  title={desc}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <input
-              className="clip-name"
-              placeholder="クリップ名（省略可）"
-              value={clipName}
-              onChange={(e) => setClipName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") doExport();
-                if (e.key === "Escape") (e.target as HTMLInputElement).blur();
-              }}
-            />
-            <button className="primary" onClick={doExport} disabled={!range} title="クリップを書き出す（E）">
-              <Icon name="scissors" /> 書き出し
+            <label className="name-field">
+              <span className="dim">名前</span>
+              <input
+                placeholder="なくてもOK"
+                value={clipName}
+                onChange={(e) => setClipName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") doExport();
+                  if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+                }}
+              />
+            </label>
+            <button className="btn primary" onClick={doExport} disabled={!range} title="切り抜く（E）">
+              切り抜く <kbd>E</kbd>
             </button>
           </div>
         </div>
 
-        <div className="marker-row">
-          <button className="ghost small" onClick={addMarker} title="今の位置にマーカー（B）。N / Shift+N で次 / 前へ">
-            <Icon name="marker" size={14} /> マーカー
-          </button>
+        <div className="row marks">
+          <span className="marks-label">しるし</span>
           {markers.length === 0 ? (
-            <span className="dim">気になった場面で B を押すと印を付けられます</span>
+            <span className="dim">気になったら B で付けておけます</span>
           ) : (
-            markers.map((m, i) => (
-              <span key={`${m}-${i}`} className="chip">
-                <button onClick={() => seekTo(m)}>{fmtTime(m, true)}</button>
-                <button className="chip-x" onClick={() => updateMarkers(markers.filter((_, j) => j !== i))} aria-label="マーカーを削除">
-                  <Icon name="close" size={12} />
-                </button>
-              </span>
-            ))
+            <>
+              {markers.map((m, i) => (
+                <span key={`${m}-${i}`} className="mark-chip">
+                  <button onClick={() => seekTo(m)} aria-label={`しるし${i + 1}（${fmtTime(m, true)}）へ移動`}>
+                    <span className="mark-no">{i + 1}</span>
+                    <span className="tc">{fmtTime(m, true)}</span>
+                  </button>
+                  <button className="mark-x" onClick={() => updateMarkers(markers.filter((_, j) => j !== i))} aria-label={`しるし${i + 1}を消す`}>
+                    ×
+                  </button>
+                </span>
+              ))}
+              <span className="dim">N で次のしるしへ</span>
+            </>
           )}
         </div>
-      </div>
+      </section>
     </main>
   );
 }

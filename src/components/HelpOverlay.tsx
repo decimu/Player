@@ -1,33 +1,33 @@
 import { useEffect } from "react";
-import { Icon } from "./Icon";
 
 const SECTIONS: { title: string; keys: [string, string][] }[] = [
   {
-    title: "再生",
+    title: "見る",
     keys: [
       ["Space / K", "再生 / 一時停止"],
-      ["← / →", "5 秒戻る / 進む（設定で変更可）"],
+      ["← / →", "5 秒戻る / 進む（設定で変えられます）"],
       ["Shift + ← / →", "1 秒戻る / 進む"],
       ["J / L", "10 秒戻る / 進む"],
-      [", / .", "1 コマ戻る / 進む"],
-      ["[ / ]", "再生速度を下げる / 上げる"],
+      [", / .", "1 コマ戻す / 送る"],
+      ["[ / ]", "遅くする / 速くする"],
       ["0 〜 9", "0% 〜 90% の位置へ"],
-      ["Home / End", "先頭 / 末尾へ"],
+      ["Home / End", "最初 / 最後へ"],
       ["↑ / ↓ / M", "音量 / ミュート"],
-      ["F / ダブルクリック", "全画面"],
-      ["R", "動画を再読み込み"],
+      ["F / ダブルクリック", "全画面（Esc で戻る）"],
+      ["R", "動画を読み直す"],
     ],
   },
   {
-    title: "クリップ・マーカー",
+    title: "切り抜き・しるし",
     keys: [
-      ["I / O", "今の位置を開始 / 終了にする"],
-      ["Shift + I / O", "開始 / 終了の位置へ移動"],
+      ["I / O", "今の位置を「ここから」/「ここまで」に"],
+      ["Shift + I / O", "「ここから」/「ここまで」へ移動"],
       ["Q", "直前 15 秒を範囲にする"],
-      ["X", "範囲をクリア"],
-      ["E / Enter", "書き出し"],
-      ["B", "今の位置にマーカー"],
-      ["N / Shift + N", "次 / 前のマーカーへ"],
+      ["X", "範囲を消す"],
+      ["E / Enter", "切り抜く"],
+      ["B", "今の位置にしるし"],
+      ["N / Shift + N", "次 / 前のしるしへ"],
+      ["?", "この一覧"],
     ],
   },
 ];
@@ -46,11 +46,11 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div className="modal panel help" role="dialog" aria-modal="true" aria-labelledby="help-title">
         <header>
-          <h2 id="help-title">ショートカット</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="閉じる">
-            <Icon name="close" />
+          <h2 id="help-title">キー操作</h2>
+          <button className="btn small" onClick={onClose} autoFocus>
+            閉じる
           </button>
         </header>
         <div className="help-grid">

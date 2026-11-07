@@ -7,16 +7,15 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileList, type Tab } from "./components/FileList";
 import { HelpOverlay } from "./components/HelpOverlay";
-import { Icon } from "./components/Icon";
 import { Jobs, type Job } from "./components/Jobs";
 import { Player, type ExportRequest } from "./components/Player";
 import { checkFfmpeg, SettingsDialog } from "./components/SettingsDialog";
 import { api, errorText, type ClipProgress, type FfmpegInfo, type VideoFile } from "./lib/api";
-import { joinPath, stripExt } from "./lib/format";
+import { fmtClock, joinPath, recordingLabel, stripExt } from "./lib/format";
 import { useSettings } from "./lib/settings";
 import { useFolderWatch } from "./lib/useFolderWatch";
 
-type Current = { file: VideoFile; autoPlay: boolean };
+type Current = { file: VideoFile; autoPlay: boolean; auto?: boolean };
 type Toast = { id: number; text: string; action?: { label: string; run: () => void } };
 
 let seq = 1;
@@ -55,12 +54,13 @@ export default function App() {
     },
     onNew: (fresh) => {
       const f = fresh[0];
+      const name = `${fmtClock(f.modified)} の${recordingLabel(f.name)}`;
       if (settings.autoOpen) {
-        openFile(f, settings.autoPlay);
+        setCurrent({ file: f, autoPlay: settings.autoPlay, auto: true });
         setTab("rec");
-        toast(`新しい録画を開きました: ${stripExt(f.name)}`);
+        toast(`${name}を開きました`);
       } else {
-        toast(`新しい録画: ${stripExt(f.name)}`, { label: "開く", run: () => openFile(f) });
+        toast(`${name}ができました`, { label: "開く", run: () => openFile(f) });
       }
     },
   });
@@ -146,7 +146,7 @@ export default function App() {
   const copyFile = async (path: string) => {
     try {
       await api.copyFileToClipboard(path);
-      toast("クリップボードにコピーしました。Discord などで Ctrl+V で貼り付けられます。");
+      toast("コピーしました。Discord のメッセージ欄で Ctrl+V すると貼れます");
     } catch (e) {
       toast(errorText(e));
     }
@@ -209,34 +209,20 @@ export default function App() {
           clips={clips.files}
           writing={rec.writing}
           currentPath={currentPath}
+          loaded={tab === "rec" ? rec.loaded : clips.loaded}
           error={tab === "rec" ? rec.error : clips.error}
+          ffmpegMissing={!ffmpeg && !!ffmpegError}
           onPickFolder={pickFolder}
-          onRefresh={() => {
-            rec.refresh();
-            clips.refresh();
-          }}
           onOpen={(f) => openFile(f)}
-          footer={
-            <footer className="sidebar-foot">
-              <button className="ghost small" onClick={() => setShowSettings(true)}>
-                <Icon name="settings" size={16} /> 設定
-              </button>
-              <button className="ghost small" onClick={() => setShowHelp(true)}>
-                <Icon name="help" size={16} /> ショートカット
-              </button>
-              {!ffmpeg && ffmpegError && (
-                <button className="warn small" onClick={() => setShowSettings(true)} title={ffmpegError}>
-                  ffmpeg 未設定
-                </button>
-              )}
-            </footer>
-          }
+          onOpenSettings={() => setShowSettings(true)}
+          onShowHelp={() => setShowHelp(true)}
         />
       )}
 
       <Player
         file={current?.file ?? null}
         autoPlay={current?.autoPlay ?? false}
+        autoOpened={current?.auto ?? false}
         writing={!!currentPath && rec.writing.has(currentPath)}
         isClip={isClip}
         settings={settings}
@@ -253,6 +239,7 @@ export default function App() {
 
       <Jobs
         jobs={jobs}
+        limitMb={settings.discordMb}
         onCancel={(id) => api.cancelClip(id)}
         onDismiss={(id) => setJobs((js) => js.filter((j) => j.id !== id))}
         onPlay={(path) => {
@@ -270,7 +257,7 @@ export default function App() {
 
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className="toast">
+          <div key={t.id} className="toast panel">
             <span>{t.text}</span>
             {t.action && (
               <button
@@ -287,7 +274,7 @@ export default function App() {
         ))}
       </div>
 
-      {dropping && <div className="drop-overlay">ここにドロップして開く（フォルダなら録画フォルダに設定）</div>}
+      {dropping && <div className="drop-overlay">ここに落とすと開きます（フォルダなら録画フォルダにします）</div>}
 
       {showSettings && (
         <SettingsDialog

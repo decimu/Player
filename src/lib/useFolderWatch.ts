@@ -31,6 +31,8 @@ export function useFolderWatch(dir: string | null, opts: Options = {}) {
   const [files, setFiles] = useState<VideoFile[]>([]);
   const [writing, setWriting] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  /** 最初の一覧取得が終わったか（読み込み中の表示に使う） */
+  const [loaded, setLoaded] = useState(false);
 
   const optsRef = useRef(opts);
   optsRef.current = opts;
@@ -71,8 +73,10 @@ export function useFolderWatch(dir: string | null, opts: Options = {}) {
       setFiles((prev) => (sameList(prev, list) ? prev : list));
       setWriting((prev) => (sameSet(prev, nowWriting) ? prev : nowWriting));
       setError(null);
+      setLoaded(true);
     } catch (e) {
       setError(errorText(e));
+      setLoaded(true);
     } finally {
       inFlight.current = false;
     }
@@ -84,6 +88,7 @@ export function useFolderWatch(dir: string | null, opts: Options = {}) {
     setFiles([]);
     setWriting(new Set());
     setError(null);
+    setLoaded(false);
     if (!dir) return;
 
     refresh();
@@ -99,5 +104,5 @@ export function useFolderWatch(dir: string | null, opts: Options = {}) {
     };
   }, [dir, refresh]);
 
-  return { files, writing, error, refresh };
+  return { files, writing, error, loaded, refresh };
 }

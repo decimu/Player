@@ -103,15 +103,17 @@ export function Timeline(props: Props) {
       {markers.map((m, i) => (
         <div
           key={`${m}-${i}`}
-          className="tl-marker"
+          className="tl-mark"
           data-marker={m}
           style={{ left: `${pct(m)}%` }}
-          title={`マーカー ${fmtTime(m, true)}（クリックで移動）`}
-        />
+          title={`しるし${i + 1} ${fmtTime(m, true)}（クリックで移動）`}
+        >
+          {i + 1}
+        </div>
       ))}
 
-      {inPoint != null && <div className="tl-handle in" data-handle="in" style={{ left: `${pct(inPoint)}%` }} title="IN（ドラッグで調整）" />}
-      {outPoint != null && <div className="tl-handle out" data-handle="out" style={{ left: `${pct(outPoint)}%` }} title="OUT（ドラッグで調整）" />}
+      {inPoint != null && <div className="tl-handle in" data-handle="in" style={{ left: `${pct(inPoint)}%` }} title="ここから（ドラッグで調整）" />}
+      {outPoint != null && <div className="tl-handle out" data-handle="out" style={{ left: `${pct(outPoint)}%` }} title="ここまで（ドラッグで調整）" />}
 
       <div className="tl-head" style={{ left: `${pct(current)}%` }} />
 

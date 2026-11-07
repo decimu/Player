@@ -71,3 +71,16 @@ export function baseName(path: string): string {
 export function stripExt(name: string): string {
   return name.replace(/\.[^.]+$/, "");
 }
+
+/** 一覧や見出し用の呼び名。OBS の既定の名前なら「録画」「リプレイ」、それ以外はファイル名 */
+export function recordingLabel(name: string): string {
+  const stem = stripExt(name);
+  if (/^replay\b/i.test(stem)) return "リプレイ";
+  if (/^\d{4}-\d{2}-\d{2}[ _]\d{2}-\d{2}-\d{2}$/.test(stem)) return "録画";
+  return stem;
+}
+
+/** 再生速度の表示: 1 は「ふつう」、それ以外は「0.5倍」 */
+export function rateLabel(rate: number): string {
+  return rate === 1 ? "ふつう" : `${rate}倍`;
+}
