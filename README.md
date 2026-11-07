@@ -84,29 +84,48 @@ OBS 30 以降には録画を分割するホットキー（Split Recording）が�
 
 ## 開発
 
-### 必要なもの
+パッケージマネージャーは **bun** を使います（npm などは使いません）。
 
-- [Node.js](https://nodejs.org/) 20 以上
-- [Rust](https://www.rust-lang.org/tools/install)（stable）
-- Windows: Visual Studio の「C++ によるデスクトップ開発」ビルドツール、WebView2（Windows 10/11 には入っています）
-- そのほか OS ごとの準備は [Tauri の Prerequisites](https://v2.tauri.app/start/prerequisites/) を参照
+### 必要なもの（Windows）
+
+PowerShell かコマンドプロンプトで順に実行し、終わったら **ターミナルを開き直して** ください（PATH を反映するため）。
+
+1. C++ ビルドツール（Rust が Windows 用の実行ファイルを作るのに必要）
+   ```bat
+   winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+   ```
+2. Rust
+   ```bat
+   winget install --id Rustlang.Rustup
+   ```
+3. bun
+   ```bat
+   winget install --id Oven-sh.Bun
+   ```
+
+開き直したターミナルで `cargo --version` と `bun --version` が表示されれば準備完了です。
+WebView2 は Windows 10 / 11 に最初から入っています。そのほかの OS は [Tauri の Prerequisites](https://v2.tauri.app/start/prerequisites/) を参照してください。
 
 ### コマンド
 
 ```bash
-npm install
+bun install
 ```
 
 ```bash
-npm run tauri dev
+bun run tauri dev
 ```
 
 ```bash
-npm run tauri build
+bun run tauri build
 ```
 
-`npm run tauri build` でインストーラーが `src-tauri/target/release/bundle/` にできます。
+`bun run tauri build` でインストーラーが `src-tauri/target/release/bundle/` にできます。
 手元に Rust を入れなくても、GitHub の Actions タブで「Windows ビルド」を手動実行すると、インストーラーを Artifacts からダウンロードできます（`v` で始まるタグを push したときも動きます）。
+
+```bash
+bun run typecheck
+```
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml
