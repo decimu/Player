@@ -1,5 +1,6 @@
 import type { ClipMode, ClipResult } from "../lib/api";
 import { baseName, fmtSize } from "../lib/format";
+import { Digits } from "./Digits";
 
 export type Job = {
   id: number;
@@ -54,7 +55,9 @@ export function Jobs({ jobs, limitMb, onCancel, onDismiss, onPlay, onReveal, onC
                 <div className="progress" role="progressbar" aria-valuenow={Math.round(j.ratio * 100)} aria-valuemin={0} aria-valuemax={100}>
                   <div style={{ width: `${Math.round(j.ratio * 100)}%` }} />
                 </div>
-                <span className="tc">{Math.round(j.ratio * 100)}%</span>
+                <span className="tc">
+                  <Digits text={`${Math.round(j.ratio * 100)}%`} />
+                </span>
                 <button className="btn small" onClick={() => onCancel(j.id)}>
                   やめる
                 </button>

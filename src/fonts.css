@@ -1,0 +1,27 @@
+/*
+ * LINE Seed JP をアプリに同梱する（SIL Open Font License 1.1）。
+ * 日本語版のファイルに英数字も入っているので、それだけを woff2 で読み込む
+ * （フォントの全部の文字セットや woff 版まで入れると配布物が 16MB を超えるため）。
+ * 矢印など入っていない文字は、下の styles.css の代わりのフォントで表示される。
+ */
+@font-face {
+  font-family: "LINE Seed JP";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../node_modules/@fontsource/line-seed-jp/files/line-seed-jp-japanese-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "LINE Seed JP";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../node_modules/@fontsource/line-seed-jp/files/line-seed-jp-japanese-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "LINE Seed JP";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../node_modules/@fontsource/line-seed-jp/files/line-seed-jp-japanese-800-normal.woff2") format("woff2");
+}

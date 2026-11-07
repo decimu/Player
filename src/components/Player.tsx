@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fileSrc, type ClipMode, type VideoFile } from "../lib/api";
 import { fmtClock, fmtDuration, fmtSize, fmtTime, rateLabel, recordingLabel, stripExt } from "../lib/format";
 import { loadMarkers, saveMarkers, type Settings } from "../lib/settings";
+import { Digits } from "./Digits";
 import { Timeline } from "./Timeline";
 
 const RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
@@ -520,7 +521,7 @@ export function Player(props: Props) {
 
         <div className="row">
           <span className="tc timecode">
-            {fmtTime(current, true)} <span className="dim">/ {fmtTime(duration)}</span>
+            <Digits text={fmtTime(current, true)} /> <span className="dim">/ {fmtTime(duration)}</span>
           </span>
           <div className="group">
             <button className="btn square" onClick={() => seekBy(-skip)} aria-label={`${skip}秒戻る`} title={`${skip}秒戻る（←）`}>

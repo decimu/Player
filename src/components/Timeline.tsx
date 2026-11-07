@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtTime } from "../lib/format";
+import { Digits } from "./Digits";
 
 type Props = {
   src: string | null;
@@ -119,7 +120,9 @@ export function Timeline(props: Props) {
 
       <div className="tl-preview" style={{ left: previewLeft, visibility: hover && src ? "visible" : "hidden" }}>
         {src && <HoverPreview src={src} t={hover?.t ?? 0} />}
-        <span className="tl-preview-time">{fmtTime(hover?.t ?? 0, true)}</span>
+        <span className="tl-preview-time">
+          <Digits text={fmtTime(hover?.t ?? 0, true)} />
+        </span>
       </div>
     </div>
   );

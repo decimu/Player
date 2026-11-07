@@ -18,11 +18,12 @@
   --rec: #ff6b6b;
   --stage: #0a0b0d;
   --played: #5a606b;
-  --font: "M PLUS Rounded 1c", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
-  --font-code: "M PLUS 1 Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --font: "LINE Seed JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  /* 設定画面のパス表示やエラーの詳細など、文字をそのまま見せたい所だけ */
+  --font-code: "Cascadia Mono", Consolas, ui-monospace, monospace;
   color-scheme: dark;
   font-family: var(--font);
-  font-weight: 500;
+  font-weight: 400;
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
@@ -110,9 +111,14 @@ select {
   font-size: 12px;
 }
 .tc {
-  font-family: var(--font-code);
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* 数字を同じ幅の枠に入れる（Digits コンポーネント）。0.73em は太字の数字の最大幅 */
+.digit {
+  display: inline-block;
+  width: 0.73em;
+  text-align: center;
 }
 
 kbd {
@@ -811,9 +817,9 @@ kbd {
   padding: 1px 8px;
   background: rgba(18, 19, 23, 0.9);
   border-radius: 8px;
-  font-family: var(--font-code);
   font-weight: 700;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 /* ---------- 切り抜きの進み具合 ---------- */
