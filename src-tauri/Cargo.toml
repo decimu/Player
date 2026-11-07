@@ -1,0 +1,25 @@
+[package]
+name = "replay-player"
+version = "0.1.0"
+description = "OBSの録画をすぐ見返してクリップを切り出すプレイヤー"
+edition = "2021"
+
+[lib]
+name = "replay_player_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+getrandom = "0.3"
+percent-encoding = "2.3.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = { version = "2.12.5", features = [] }
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-opener = "2.7.2"
+tiny_http = "0.12.0"
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
